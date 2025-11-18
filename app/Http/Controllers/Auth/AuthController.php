@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -24,16 +25,14 @@ class AuthController extends Controller
             'first_name' => $request->first_name,
             'age' => $request->age,
             'email' => $request->email,
-            'password' => bcrypt($request->password),
+            'password' => Hash::make($request->password),
         ]);
 
-        $token = $user->createToken('api_token')->plainTextToken;
 
         return response()->json([
             'status' => 'success',
             'message' => 'User registered successfully',
-            'user' => $user,
-            'token' => $token,
+            'user' => $user->only(['id', 'last_name', 'first_name', 'email', 'role']),
         ], 200);
     }
 
@@ -44,28 +43,28 @@ class AuthController extends Controller
             'password'=>'required|string',
         ]);
 
-        $user=User::where('email',$request->email)->first();
-
-        if(!$user || ! Hash::check($request->password,$user->password)){
+        $user = User::where('email', $request->email)->first();
+        
+        if(!Auth::attempt($request->only('email', 'password'))){
             return response()->json([
                 'status' => 'error',
                 'message' => 'Invalid credentials'
             ],401);
         }
 
-
-        $token=$user->createToken('api_token')->plainTextToken;
+        $token = $user->createToken('api_token')->plainTextToken;
 
         return response()->json([
             'status' => 'success',
             'message' => 'Logged in successfully',
-            'user' => $user,
+            'user' => $user->only(['id', 'last_name', 'first_name', 'email', 'role']),
             'token' => $token,
         
         ], 200);
     }
 
     public function logout(Request $request){
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
@@ -78,11 +77,8 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        return response()->json([
-            'id' => $user->id,
-            'email' => $user->email,
-            'display_name' => $user->display_name,
-            // include other fields if needed
-        ]);
+        return response()->json($user->only([
+            'id', 'last_name', 'first_name', 'email', 'role',
+        ]));    
     }
 }
