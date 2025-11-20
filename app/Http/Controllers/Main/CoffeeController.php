@@ -103,7 +103,7 @@ class CoffeeController extends Controller
     public function update(Request $request, Coffee $coffee)
     {
         $request->validate([
-            'coffee_name' => 'required|string|max:255',
+            'coffee_name' => 'nullable|string|max:255',
             'image_url' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'description' => 'nullable|string',
             'ingredients' => 'nullable|string',
