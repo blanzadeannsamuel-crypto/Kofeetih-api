@@ -7,15 +7,12 @@ use Illuminate\Support\Facades\DB;
 
 class CoffeeSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         DB::table('coffees')->insert([
             [
                 'coffee_name' => 'Espresso',
-                'image_url' => 'https://example.com/images/espresso.jpg',
+                'image_url' => 'espresso.jpg',
                 'description' => 'A strong and bold coffee shot with intense flavor.',
                 'ingredients' => 'Finely ground coffee beans',
                 'coffee_type' => 'strong',
@@ -31,7 +28,7 @@ class CoffeeSeeder extends Seeder
 
             [
                 'coffee_name' => 'Cappuccino',
-                'image_url' => 'https://example.com/images/cappuccino.jpg',
+                'image_url' => 'cappuccino.jpg',
                 'description' => 'Perfect balance of espresso, steamed milk, and foamed milk.',
                 'ingredients' => 'Espresso, steamed milk, milk foam',
                 'coffee_type' => 'balanced',
@@ -47,7 +44,7 @@ class CoffeeSeeder extends Seeder
 
             [
                 'coffee_name' => 'Cafe Mocha',
-                'image_url' => 'https://example.com/images/mocha.jpg',
+                'image_url' => 'mocha.jpg',
                 'description' => 'A delicious combination of chocolate, espresso, and milk.',
                 'ingredients' => 'Espresso, chocolate syrup, steamed milk, whipped cream',
                 'coffee_type' => 'sweet',
@@ -63,7 +60,7 @@ class CoffeeSeeder extends Seeder
 
             [
                 'coffee_name' => 'Americano',
-                'image_url' => 'https://example.com/images/americano.jpg',
+                'image_url' => 'americano.jpg',
                 'description' => 'Espresso diluted with hot water. Smooth but strong.',
                 'ingredients' => 'Espresso, hot water',
                 'coffee_type' => 'strong',
@@ -79,7 +76,7 @@ class CoffeeSeeder extends Seeder
 
             [
                 'coffee_name' => 'Caramel Latte',
-                'image_url' => 'https://example.com/images/caramel-latte.jpg',
+                'image_url' => 'caramel-latte.jpg',
                 'description' => 'A sweet and creamy latte topped with caramel drizzle.',
                 'ingredients' => 'Espresso, steamed milk, caramel syrup',
                 'coffee_type' => 'sweet',
