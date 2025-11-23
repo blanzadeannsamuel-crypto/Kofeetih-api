@@ -14,12 +14,14 @@ return new class extends Migration
         Schema::create('preferences', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('coffee_type');
-            $table->unsignedInteger('coffee_allowance');
-            $table->enum('temp', ['hot', 'cold']);
-            $table->string('lactose')->default('no');
-            $table->string('nuts_allergy')->default('no');
+            $table->string('coffee_type')->nullable();
+            $table->unsignedInteger('coffee_allowance')->nullable();
+            $table->enum('temp', ['hot', 'cold'])->nullable();
+            $table->boolean('lactose')->default(false);
+            $table->boolean('nuts_allergy')->default(false);
             $table->timestamps();
+            $table->softDeletes();
+            $table->unique('user_id'); // ensures only one preference per user
         });
     }
 

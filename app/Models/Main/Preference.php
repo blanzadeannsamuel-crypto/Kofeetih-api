@@ -3,11 +3,14 @@
 namespace App\Models\Main;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\User;
 
 class Preference extends Model
 {
-    protected $fillable  = [
+    use SoftDeletes;
+
+    protected $fillable = [
         'user_id',
         'coffee_type',
         'coffee_allowance',
@@ -22,7 +25,11 @@ class Preference extends Model
         'nuts_allergy' => 'boolean',
     ];
 
-    public function user(){
+    /**
+     * Relationship to User
+     */
+    public function user()
+    {
         return $this->belongsTo(User::class);
     }
 }

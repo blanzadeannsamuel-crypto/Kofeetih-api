@@ -14,6 +14,17 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory()->count(20)->create();
+        // Create an admin user
+        User::create([
+            'last_name' => 'blanza',
+            'first_name' => 'deann samuel',
+            'age' => 19,
+            'email' => 'sam@gmail.com',
+            'password' => Hash::make('12345678'), // change to secure password
+            'role' => 'admin',
+        ]);
+
+        // Create 20 normal users using the factory
+        User::factory()->count(300)->create();
     }
 }

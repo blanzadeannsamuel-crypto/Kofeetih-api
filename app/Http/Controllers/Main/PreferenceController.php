@@ -6,78 +6,62 @@ use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use App\Models\Main\Preference;
+use Illuminate\Support\Facades\Cache;
 
 class PreferenceController extends Controller
 {
     use AuthorizesRequests;
 
-
     public function index(Request $request)
     {
         $user = $request->user();
-        $preference = Preference::where('user_id', $user->id)->first();
+
+        $preference = Cache::remember("preference_user_{$user->id}", 3600, function () use ($user) {
+            return Preference::firstOrCreate(['user_id' => $user->id]);
+        });
 
         return response()->json([
             'status' => 'success',
-            'message' => $preference,
-        ], 201);
+            'data' => $preference,
+        ]);
     }
 
-    public function create(Request $request)
-    {
-       
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-         $validate = $request->validate([
+        $validated = $request->validate([
             'coffee_type' => 'nullable|string',
             'coffee_allowance' => 'nullable|integer|min:120',
             'temp' => 'nullable|in:hot,cold',
-            'lactose' => 'boolean',
-            'nuts_allergey' => 'boolean',
+            'lactose' => 'nullable|boolean',
+            'nuts_allergy' => 'nullable|boolean',
         ]);
 
         $validated['user_id'] = $request->user()->id;
 
         $preference = Preference::updateOrCreate(
-            ['user_id' => $validate['user_id']],
+            ['user_id' => $validated['user_id']],
             $validated
         );
+
+        Cache::forget("preference_user_{$validated['user_id']}");
 
         return response()->json([
             'status' => 'success',
             'data' => $preference,
-            'message' => 'Preferences saved.'
-        ], 200);
+            'message' => 'Preferences saved.',
+        ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(Preference $preference)
     {
         $this->authorize('view', $preference);
 
         return response()->json([
-            'data' => $preference
-        ], 200);
+            'status' => 'success',
+            'data' => $preference,
+        ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Preference $preference)
     {
         $this->authorize('update', $preference);
@@ -86,31 +70,56 @@ class PreferenceController extends Controller
             'coffee_type' => 'nullable|string',
             'coffee_allowance' => 'nullable|integer|min:120',
             'temp' => 'nullable|in:hot,cold',
-            'lactose' => 'boolean',
-            'nuts_allergey' => 'boolean',
+            'lactose' => 'nullable|boolean',
+            'nuts_allergy' => 'nullable|boolean',
         ]);
 
         $preference->update($validated);
 
-        return response()->json([
-            'data' => $preference,
-            'message' => 'Preference Updated'
-        ], 200);
+        Cache::forget("preference_user_{$preference->user_id}");
 
+        return response()->json([
+            'status' => 'success',
+            'data' => $preference,
+            'message' => 'Preference updated.',
+        ]);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Preference $preference)
     {
         $this->authorize('delete', $preference);
 
         $preference->delete();
 
+        Cache::forget("preference_user_{$preference->user_id}");
+
         return response()->json([
             'status' => 'success',
-            'message' => 'preference removed.'
-        ], 200);
+            'message' => 'Preference removed (soft deleted).',
+        ]);
+    }
+
+    public function restore(int $id)
+    {
+        $preference = Preference::onlyTrashed()->find($id);
+
+        if (!$preference) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Preference not found or not deleted.',
+            ], 404);
+        }
+
+        $this->authorize('restore', $preference);
+
+        $preference->restore();
+
+        Cache::forget("preference_user_{$preference->user_id}");
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Preference restored successfully.',
+            'data' => $preference,
+        ]);
     }
 }

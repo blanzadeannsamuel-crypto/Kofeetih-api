@@ -19,11 +19,11 @@ class CoffeeController extends Controller
             )
             ->withCount(['likedByUsers', 'favoritedByUsers'])
             ->with(['ratings' => function($q) use ($userId) {
-                if ($userId) {$q->where('user_id', $userId)->select('coffee_id', 'rating', 'user_id');
+                if ($userId) {
+                    $q->where('user_id', $userId)
+                    ->select('coffee_id', 'rating', 'user_id');
                 }
-            },
-            'likedByUsers:id',
-            'favoritedByUsers:id'
+            }
         ])->get();
 
             // $userLikes = $userId
@@ -33,16 +33,15 @@ class CoffeeController extends Controller
             //     ? $coffees->pluck('likedByUser')->flatten()->pluck('id')->all() : [];
 
             $coffees->each(function($coffee) use ($userId){
-                $coffee->image_url = $coffee->image_url ? asset('storage/' . $coffee->image_url) : null;
-                $coffee->likedByUser = $userId ? $coffee->likedByUsers->contains($userId) : false;
-                $coffee->favoritedByUser = $userId ? $coffee->favoritedByUsers->contains($userId) : false;
-                $coffee->userRating = optional($coffee->ratings->first())->rating;
+            $coffee->image_url = $coffee->image_url ? asset('storage/' . $coffee->image_url) : null;
 
-                unset($coffee->ratings, $coffee->likedByUsers, $coffee->favoritedByUsers);
+            $coffee->likedByUser = $userId ? $coffee->likedByUsers->contains($userId) : false;
+            $coffee->favoritedByUser = $userId ? $coffee->favoritedByUsers->contains($userId) : false;
 
-                return $coffee;
-            });
+            unset($coffee->ratings, $coffee->likedByUsers, $coffee->favoritedByUsers);
 
+            return $coffee;
+        });
         return response()->json($coffees);
     }
 
@@ -50,10 +49,10 @@ class CoffeeController extends Controller
     {
         $request->validate([
             'coffee_name' => 'required|string|max:255',
-            'image_url' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            // 'image_url' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'coffee_type' => 'required|string|max:100',
             'description' => 'nullable|string',
             'ingredients' => 'nullable|string',
-            'coffee_type' => 'nullable|string|max:100',
             'lactose' => 'nullable|string',
             'nuts' => 'nullable|string',
             'minimum_price' => 'nullable|numeric|min:120',
@@ -104,7 +103,7 @@ class CoffeeController extends Controller
     {
         $request->validate([
             'coffee_name' => 'nullable|string|max:255',
-            'image_url' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            // 'image_url' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'description' => 'nullable|string',
             'ingredients' => 'nullable|string',
             'coffee_type' => 'nullable|string|max:100',
@@ -125,7 +124,7 @@ class CoffeeController extends Controller
             $data['image_url'] = $path;
         }
 
-        $coffee = Coffee::update($data);
+        $coffee->update($data);
 
         return response()->json([
             'status' => 'success',
@@ -180,7 +179,7 @@ class CoffeeController extends Controller
         }
 
         $coffee->loadCount('favoritedByUsers');
-        $totalFavorites = $coffee->favorited_by_users_count;
+        $totalFavorites = $coffee->favorited_by_users_count + ($coffee->favorites ?? 0);
 
         return response()->json([
             'favorites' => $totalFavorites,
@@ -194,15 +193,26 @@ class CoffeeController extends Controller
 
         $request->validate(['rating' => 'required|integer|min:1|max:5']);
 
-        $coffee->ratings()->updateOrCreate(
-            ['user_id' => $user->id],
-            ['rating' => $request->rating]
+         $coffee->ratings()->updateOrCreate(
+                ['user_id' => $user->id],
+                ['rating' => $request->rating]
         );
+           
+        $dbRatings = $coffee->ratings()->pluck('rating');
+        $dbCount = $dbRatings->count();
+        $dbSum = $dbRatings->sum();
 
-        $avgRating = round($coffee->ratings()->avg('rating'), 1);
+        $seedAvg = $coffee->seeded_avg ?? 0;
+        $seedCount = $coffee->seeded_count ?? 0;
+
+
+        $totalSum = ($seedAvg * $seedCount) + $dbSum;
+        $totalCount = $seedCount + $dbCount;
+
+        $finalAvg = $totalCount > 0 ? round($totalSum / $totalCount, 1) : 0;
 
         return response()->json([
-            'rating' => $avgRating,
+            'rating' => $finalAvg,
             'userRating' => $request->rating,
         ]);
     }

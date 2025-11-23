@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Main\Coffee;
 
 class User extends Authenticatable
 {
@@ -45,4 +46,13 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+    public function likedCoffees()
+    {
+        return $this->belongsToMany(Coffee::class, 'coffee_likes');
+    }
+
+    public function favoritedCoffees()
+    {
+        return $this->belongsToMany(Coffee::class, 'coffee_favorites');
+    }
 }
