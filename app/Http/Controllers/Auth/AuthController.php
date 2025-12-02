@@ -13,16 +13,18 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $request ->validate([
-            'last_name' => 'required|string|max:100',
+            'last_name' =>  'required|string|max:100',
             'first_name' => 'required|string|max:100',
-            'age' => 'required|integer|min:13|max:99',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
+            'display_name' => 'nullable|string|max:15',
+            'age' =>        'required|integer|min:13|max:99',
+            'email' =>      'required|string|email|max:255|unique:users',
+            'password' =>   'required|string|min:8|confirmed',
         ]);
 
         $user = User::create([
             'last_name' => $request->last_name,
             'first_name' => $request->first_name,
+            'display_name' => $request->display_name ?: 'coffee',
             'age' => $request->age,
             'email' => $request->email,
             'password' => Hash::make($request->password),
@@ -32,7 +34,7 @@ class AuthController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'User registered successfully',
-            'user' => $user->only(['id', 'last_name', 'first_name', 'email', 'role']),
+            'user' => $user->only(['id', 'last_name', 'first_name', 'display_name', 'email', 'role']),
         ], 200);
     }
 
@@ -57,7 +59,7 @@ class AuthController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Logged in successfully',
-            'user' => $user->only(['id', 'last_name', 'first_name', 'email', 'role']),
+            'user' => $user->only(['id', 'last_name', 'first_name', 'display_name', 'email', 'role']),
             'token' => $token,
         
         ], 200);
@@ -65,7 +67,9 @@ class AuthController extends Controller
 
     public function logout(Request $request){
 
-        $request->user()->currentAccessToken()->delete();
+        if($request->user() && $request->user()->currentAccessToken()){
+            $request->user()->currentAccessToken()->delete();
+        }
 
         return response()->json([
             'status' => 'success',
@@ -73,12 +77,5 @@ class AuthController extends Controller
         ], 200);
     }
 
-    public function user(Request $request)
-    {
-        $user = $request->user();
-
-        return response()->json($user->only([
-            'id', 'last_name', 'first_name', 'email', 'role',
-        ]));    
-    }
+    
 }

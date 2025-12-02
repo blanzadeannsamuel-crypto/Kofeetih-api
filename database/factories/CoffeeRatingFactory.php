@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Models\Main\Coffee;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CoffeeRating>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Main\CoffeeRating>
  */
 class CoffeeRatingFactory extends Factory
 {
@@ -17,7 +17,7 @@ class CoffeeRatingFactory extends Factory
     {
         do {
             $userId = User::inRandomOrder()->first()->id;
-            $coffeeId = Coffee::inRandomOrder()->first()->id;
+            $coffeeId = Coffee::inRandomOrder()->first()->coffee_id; // <- use coffee_id
             $pairKey = $userId . '-' . $coffeeId;
         } while (in_array($pairKey, static::$existingPairs));
 

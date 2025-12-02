@@ -9,11 +9,12 @@ use App\Models\User;
 class Coffee extends Model
 {
     use HasFactory;
-    protected $table = 'coffees';
+
+    protected $primaryKey = 'coffee_id';
 
     protected $fillable = [
         'coffee_name',
-        // 'image_url',
+        'coffee_image',
         'coffee_type',
         'description',
         'ingredients',
@@ -25,30 +26,50 @@ class Coffee extends Model
         'favorites',
     ];
 
-     public function likedByUsers()
-    {
-        return $this->belongsToMany(\App\Models\User::class, 'coffee_likes');
-    }
-    
-    public function favoritedByUsers()
-    {
-        return $this->belongsToMany(\App\Models\User::class, 'coffee_favorites');
-    }
+    // fixed property name and types
+    protected $casts = [
+        'rating' => 'float',
+        'likes' => 'integer',
+        'favorites' => 'integer',
+        'minimum_price' => 'float',
+        'maximum_price' => 'float',
+    ];
 
-    public function ratings()
-    {
-        return $this->hasMany(\App\Models\Main\CoffeeRating::class);
+    public function likedBy() {
+        return $this->belongsToMany(User::class, 'coffee_likes', 'coffee_id', 'user_id')->withTimestamps();
     }
 
-
-    // Helper functions
-    public function isLikedBy(User $user)
-    {
-        return $this->likedByUsers()->where('user_id', $user->id)->exists();
+    public function favoritedBy() {
+        return $this->belongsToMany(User::class, 'coffee_favorites', 'coffee_id', 'user_id')->withTimestamps();
     }
 
-    public function isFavoritedBy(User $user)
+    public function ratings() {
+        return $this->hasMany(CoffeeRating::class, 'coffee_id');
+    }
+
+    public function getTotalLikesAttribute()
     {
-        return $this->favoritedByUsers()->where('user_id', $user->id)->exists();
+        return (intval($this->likes ?? 0) + intval($this->liked_by_count ?? 0));
+    }
+
+    public function getTotalFavoritesAttribute()
+    {
+        // fixed variable name
+        return (intval($this->favorites ?? 0) + intval($this->favorited_by_count ?? 0));
+    }
+
+    public function getFinalAverageRatingAttribute()
+    {
+        $seededAvg = (float) ($this->rating ?? 0);
+        $seededCount = 1;
+
+        $agg = $this->ratings()->selectRaw('AVG(rating) as avg_rating, COUNT(*) as count')->first();
+        $dynamicAvg = $agg->avg_rating ?? 0;
+        $dynamicCount = $agg->count ?? 0;
+
+        $totalCount = $seededCount + $dynamicCount;
+        $totalSum = ($seededAvg * $seededCount) + ($dynamicAvg * $dynamicCount);
+
+        return $totalCount > 0 ? round($totalSum / $totalCount, 1) : 0;
     }
 }

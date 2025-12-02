@@ -12,12 +12,23 @@ class PreferenceController extends Controller
 {
     use AuthorizesRequests;
 
+    private function rules(){
+        return [
+            'coffee_type' => 'nullable|string',
+            'coffee_allowance' => 'nullable|integer|min:120',
+            'temp' => 'nullable|in:hot,cold',
+            'lactose' => 'nullable|boolean',
+            'nuts_allergy' => 'nullable|boolean',
+        ];
+    }
+
     public function index(Request $request)
     {
-        $user = $request->user();
+        $userId = $request->user()->id;
+        $cacheKey = "preference_user_{$userId}";
 
-        $preference = Cache::remember("preference_user_{$user->id}", 3600, function () use ($user) {
-            return Preference::firstOrCreate(['user_id' => $user->id]);
+        $preference = Cache::remember($cacheKey, 3600, function() use ($userId) {
+            return Preference::firstOrCreate(['user_id' => $userId]);
         });
 
         return response()->json([
@@ -28,22 +39,18 @@ class PreferenceController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'coffee_type' => 'nullable|string',
-            'coffee_allowance' => 'nullable|integer|min:120',
-            'temp' => 'nullable|in:hot,cold',
-            'lactose' => 'nullable|boolean',
-            'nuts_allergy' => 'nullable|boolean',
-        ]);
 
-        $validated['user_id'] = $request->user()->id;
+        $validated = $request->validate($this->rules());
+        $userId = $request->user()->id;
+
+        $validated['user_id'] = $userId;
 
         $preference = Preference::updateOrCreate(
-            ['user_id' => $validated['user_id']],
+            ['user_id' => $userId],
             $validated
         );
 
-        Cache::forget("preference_user_{$validated['user_id']}");
+        Cache::forget("preference_user_{$userId}");
 
         return response()->json([
             'status' => 'success',
@@ -66,13 +73,7 @@ class PreferenceController extends Controller
     {
         $this->authorize('update', $preference);
 
-        $validated = $request->validate([
-            'coffee_type' => 'nullable|string',
-            'coffee_allowance' => 'nullable|integer|min:120',
-            'temp' => 'nullable|in:hot,cold',
-            'lactose' => 'nullable|boolean',
-            'nuts_allergy' => 'nullable|boolean',
-        ]);
+        $validated = $request->validate($this->rules());
 
         $preference->update($validated);
 
@@ -95,7 +96,7 @@ class PreferenceController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Preference removed (soft deleted).',
+            'message' => 'Preference removed.',
         ]);
     }
 

@@ -5,47 +5,77 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Main\Coffee;
+use App\Models\Main\Like;
+use App\Models\Main\Favorite;
+use App\Models\Main\CoffeeRating;
+use Faker\Factory as Faker;
+use Carbon\Carbon;
 
 class InteractionSeeder extends Seeder
 {
     public function run(): void
     {
-        // Get all existing coffees
+        $faker = Faker::create();
         $coffees = Coffee::all();
 
-        // Create 300 users
-        $users = User::factory(300)->create();
+        foreach (User::all() as $user) {
 
-        foreach ($users as $user) {
             // --------------------
             // Likes
             // --------------------
-            $randomCoffees = $coffees->random(rand(1, 5));
+            $likeCount = rand(1, min(5, $coffees->count()));
+            $randomCoffees = $coffees->random($likeCount);
             foreach ($randomCoffees as $coffee) {
-                $user->likedCoffees()->syncWithoutDetaching([$coffee->id]);
+                // Prevent duplicate likes
+                Like::firstOrCreate(
+                    ['user_id' => $user->id, 'coffee_id' => $coffee->coffee_id],
+                    ['created_at' => $this->randomDate($faker), 'updated_at' => $this->randomDate($faker)]
+                );
             }
 
             // --------------------
             // Favorites
             // --------------------
-            $randomCoffees = $coffees->random(rand(1, 3));
+            $favCount = rand(1, min(3, $coffees->count()));
+            $randomCoffees = $coffees->random($favCount);
             foreach ($randomCoffees as $coffee) {
-                $user->favoritedCoffees()->syncWithoutDetaching([$coffee->id]);
+                // Prevent duplicate favorites
+                Favorite::firstOrCreate(
+                    ['user_id' => $user->id, 'coffee_id' => $coffee->coffee_id],
+                    ['created_at' => $this->randomDate($faker), 'updated_at' => $this->randomDate($faker)]
+                );
             }
 
             // --------------------
-            // Ratings (some may skip)
+            // Ratings
             // --------------------
-            $randomCoffees = $coffees->random(rand(1, 4));
+            $ratingCount = rand(1, min(4, $coffees->count()));
+            $randomCoffees = $coffees->random($ratingCount);
             foreach ($randomCoffees as $coffee) {
-                // 70% chance the user rates this coffee
-                if (rand(1, 100) <= 70) {
-                    $coffee->ratings()->create([
-                        'user_id' => $user->id,
-                        'rating' => rand(1, 5),
-                    ]);
+                if (rand(1, 100) <= 70) { // 70% chance user rates it
+                    // Prevent duplicate ratings
+                    CoffeeRating::updateOrCreate(
+                        ['user_id' => $user->id, 'coffee_id' => $coffee->coffee_id],
+                        ['rating' => rand(1, 5), 'created_at' => $this->randomDate($faker), 'updated_at' => $this->randomDate($faker)]
+                    );
                 }
             }
         }
+    }
+
+    private function randomDate($faker)
+    {
+        $year = $faker->numberBetween(2020, 2025);
+        $month = $faker->numberBetween(1, 12);
+        $day = $faker->numberBetween(1, 28);
+
+        return Carbon::create(
+            $year,
+            $month,
+            $day,
+            $faker->numberBetween(0, 23),
+            $faker->numberBetween(0, 59),
+            0
+        );
     }
 }

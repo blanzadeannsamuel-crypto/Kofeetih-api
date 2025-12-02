@@ -21,7 +21,11 @@ return new class extends Migration
             $table->boolean('nuts_allergy')->default(false);
             $table->timestamps();
             $table->softDeletes();
-            $table->unique('user_id'); // ensures only one preference per user
+            $table->unique('user_id'); 
+
+            $table->index('coffee_type');
+            $table->index('coffee_allowance');
+            $table->index('temp');
         });
     }
 

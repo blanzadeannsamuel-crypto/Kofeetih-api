@@ -18,6 +18,7 @@ class UserSeeder extends Seeder
         User::create([
             'last_name' => 'blanza',
             'first_name' => 'deann samuel',
+            'display_name' => 'sam',
             'age' => 19,
             'email' => 'sam@gmail.com',
             'password' => Hash::make('12345678'), // change to secure password
@@ -25,6 +26,6 @@ class UserSeeder extends Seeder
         ]);
 
         // Create 20 normal users using the factory
-        User::factory()->count(300)->create();
+        User::factory()->count(1234)->create();
     }
 }

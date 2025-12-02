@@ -7,16 +7,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 use App\Models\Main\Coffee;
+use App\Models\Main\Preference;
+use App\Models\Main\Like;
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'last_name',
         'first_name',
@@ -27,32 +24,48 @@ class User extends Authenticatable
         'role',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
-    public function likedCoffees()
+
+    public function likes()
     {
-        return $this->belongsToMany(Coffee::class, 'coffee_likes');
+        return $this->belongsToMany(
+            Coffee::class,
+            'coffee_likes',
+            'user_id',
+            'coffee_id'
+        )->withTimestamps()->using(Like::class);
     }
 
-    public function favoritedCoffees()
+    public function favorites()
     {
-        return $this->belongsToMany(Coffee::class, 'coffee_favorites');
+        return $this->belongsToMany(
+            Coffee::class,
+            'coffee_favorites',
+            'user_id',
+            'coffee_id'
+        )->withTimestamps();
+    }
+
+    public function ratings()
+    {
+        return $this->belongsToMany(
+            Coffee::class,
+            'coffee_ratings',
+            'user_id',
+            'coffee_id'
+        )->withPivot('rating')->withTimestamps();
+    }
+
+    public function preference()
+    {
+        return $this->hasOne(Preference::class, 'user_id');
     }
 }

@@ -6,47 +6,50 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('coffee_likes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('coffee_id')->constrained('coffees')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->unsignedBigInteger('coffee_id');
+            $table->foreign('coffee_id')->references('coffee_id')->on('coffees')->onDelete('cascade'); 
             $table->timestamps();
-            $table->unique(['user_id', 'coffee_id']); // prevents multiple likes by same user
+            $table->unique(['user_id', 'coffee_id']); 
+
+            $table->index('coffee_id');
+            $table->index('user_id');
         });
 
         Schema::create('coffee_favorites', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('coffee_id')->constrained('coffees')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->unsignedBigInteger('coffee_id');
+            $table->foreign('coffee_id')->references('coffee_id')->on('coffees')->onDelete('cascade'); 
             $table->timestamps();
+            $table->unique(['user_id', 'coffee_id']); 
 
-            $table->unique(['user_id', 'coffee_id']); // prevents multiple favorites
+            $table->index('coffee_id');
+            $table->index('user_id');
         });
+
         Schema::create('coffee_ratings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('coffee_id')->constrained('coffees')->onDelete('cascade');
-            $table->tinyInteger('rating'); // 1-5
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->unsignedBigInteger('coffee_id');
+            $table->foreign('coffee_id')->references('coffee_id')->on('coffees')->onDelete('cascade'); 
+            $table->integer('rating')->default(0);
             $table->timestamps();
+            $table->unique(['user_id', 'coffee_id']);
 
-            $table->unique(['user_id', 'coffee_id']); // 1 rating per user per coffee
+            $table->index('coffee_id');
+            $table->index('user_id');
         });
-
-
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('coffee_user_likes');
-        Schema::dropIfExists('coffee_user_favorites');
+        Schema::dropIfExists('coffee_likes');
+        Schema::dropIfExists('coffee_favorites');
         Schema::dropIfExists('coffee_ratings');
     }
 };

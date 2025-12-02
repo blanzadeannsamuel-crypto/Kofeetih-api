@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('coffees', function (Blueprint $table) {
-            $table->id();
+            $table->id('coffee_id');
             $table->string('coffee_name');
-            $table->string('image_url')->nullable();
+            $table->string('coffee_image')->nullable();
             $table->text('description')->nullable();
             $table->string('ingredients')->nullable();
             $table->enum('coffee_type', ['strong', 'balanced', 'sweet']);
@@ -26,6 +26,13 @@ return new class extends Migration
             $table->integer('likes')->unsigned()->default(0);
             $table->integer('favorites')->unsigned()->default(0);
             $table->timestamps();
+
+
+            $table->index('coffee_name');
+            $table->index('coffee_type');
+            $table->index('rating');
+            $table->index('likes');
+            $table->index('favorites');
         });
     }
 

@@ -10,9 +10,15 @@ class CoffeeRating extends Model
 {
     protected $fillable = ['user_id','coffee_id','rating'];
 
+    protected $casts = [
+        'user_id'   => 'integer',
+        'coffee_id' => 'integer',
+        'rating'    => 'float',
+    ];
+
     public function coffee()
     {
-        return $this->belongsTo(Coffee::class);
+        return $this->belongsTo(Coffee::class, 'coffee_id');
     }
 
     public function user()

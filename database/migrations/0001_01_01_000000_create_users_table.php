@@ -32,6 +32,8 @@ return new class extends Migration
             $table->string('email', 255)->primary();
             $table->string('token');
             $table->timestamp('created_at')->nullable();
+
+            $table->index('token');
         });
 
         Schema::create('sessions', function (Blueprint $table) {

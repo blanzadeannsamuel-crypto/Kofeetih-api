@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) { // <-- must be 'users'
-            $table->string('display_name')->default('coffee')->after('first_name');
+            $table->string('display_name')->after('first_name');
         });
     }
 
