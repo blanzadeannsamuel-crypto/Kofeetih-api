@@ -19,7 +19,7 @@ class UserSeeder extends Seeder
             'last_name' => 'blanza',
             'first_name' => 'deann samuel',
             'display_name' => 'sam',
-            'age' => 19,
+            'birthdate' => '2006-05-03',
             'email' => 'sam@gmail.com',
             'password' => Hash::make('12345678'), // change to secure password
             'role' => 'admin',

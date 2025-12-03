@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('coffee_type')->nullable();
             $table->unsignedInteger('coffee_allowance')->nullable();
-            $table->enum('temp', ['hot', 'cold'])->nullable();
+            $table->enum('serving_temp', ['hot', 'cold', 'both'])->nullable();
             $table->boolean('lactose')->default(false);
             $table->boolean('nuts_allergy')->default(false);
             $table->timestamps();
@@ -25,7 +25,7 @@ return new class extends Migration
 
             $table->index('coffee_type');
             $table->index('coffee_allowance');
-            $table->index('temp');
+            $table->index('serving_temp');
         });
     }
 

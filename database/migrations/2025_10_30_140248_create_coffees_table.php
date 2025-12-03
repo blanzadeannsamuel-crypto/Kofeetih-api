@@ -17,12 +17,12 @@ return new class extends Migration
             $table->string('coffee_image')->nullable();
             $table->text('description')->nullable();
             $table->string('ingredients')->nullable();
-            $table->enum('coffee_type', ['strong', 'balanced', 'sweet']);
-            $table->string('lactose')->default('no');
-            $table->string('nuts')->default('no');
-            $table->decimal('minimum_price', 5, 2);
-            $table->decimal('maximum_price', 5, 2);
-            $table->smallInteger('rating')->unsigned()->default(0);
+            $table->enum('coffee_type', ['arabica', 'robusta', 'liberica']);
+            $table->enum('serving_temp', ['hot', 'cold', 'both'])->default('hot');
+            $table->boolean('lactose')->default(false);
+            $table->boolean('nuts')->default(false);
+            $table->decimal('price', 5, 2)->default(0.00);
+           $table->float('rating', 3, 2)->default(0.00);
             $table->integer('likes')->unsigned()->default(0);
             $table->integer('favorites')->unsigned()->default(0);
             $table->timestamps();
@@ -35,10 +35,6 @@ return new class extends Migration
             $table->index('favorites');
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('coffees');

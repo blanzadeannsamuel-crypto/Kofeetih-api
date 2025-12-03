@@ -6,10 +6,12 @@ use App\Http\Controllers\Main\CoffeeController;
 use App\Http\Controllers\Main\ChartController;
 use App\Http\Controllers\Main\PreferenceController;
 use App\Http\Controllers\CoffeeFactController;
+use App\Http\Controllers\Main\AuditLogController;
 use App\Models\User;
 
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::middleware(['throttle:5,1'])->post('/login', [AuthController::class, 'login']);
+
 
 Route::middleware(['auth:sanctum'])->group(function () {
 
@@ -34,10 +36,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('preferences')->group(function () {
         Route::get('/', [PreferenceController::class, 'index']);
         Route::post('/', [PreferenceController::class, 'store']);
-        Route::get('/{preference}', [PreferenceController::class, 'show']);
-        Route::put('/{preference}', [PreferenceController::class, 'update']);
-        Route::delete('/{preference}', [PreferenceController::class, 'destroy']);
-        Route::post('/restore/{id}', [PreferenceController::class, 'restore']);
+        Route::get('/{preference}', [PreferenceController::class, 'show'])->middleware('can:view,preference');
+        Route::put('/{preference}', [PreferenceController::class, 'update'])->middleware('can:update,preference');
+        Route::delete('/{preference}', [PreferenceController::class, 'destroy'])->middleware('can:delete,preference');
+        Route::patch('/restore/{id}', [PreferenceController::class, 'restore']);
     });
 });
 
@@ -61,7 +63,13 @@ Route::middleware(['auth:sanctum','admin'])->group(function () {
 
     Route::get('/all-user', [UserController::class, 'allUser']);
 
-    Route::get('/storage/coffees/{filename}', function ($filename) {
+    Route::get('/audit-logs/users', [AuditLogController::class, 'allUsers']);
+    Route::post('/admin/request-delete/{id}', [AuditLogController::class, 'adminRequestDelete']);
+    Route::get('/audit-logs', [AuditLogController::class, 'auditList']);
+    Route::put('/users/{id}/status', [AuditLogController::class, 'toggleStatus']);
+});
+
+Route::get('/storage/coffees/{filename}', function ($filename) {
         $path = storage_path('app/public/coffees/' . $filename);
 
         if (!file_exists($path)) {
@@ -72,5 +80,3 @@ Route::middleware(['auth:sanctum','admin'])->group(function () {
             'Access-Control-Allow-Origin' => '*', 
         ]);
     });
-});
-

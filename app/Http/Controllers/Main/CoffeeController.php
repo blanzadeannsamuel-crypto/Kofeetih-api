@@ -28,6 +28,8 @@ class CoffeeController extends Controller
                 'description'      => $coffee->description,
                 'ingredients'      => $coffee->ingredients,
                 'coffee_type'      => $coffee->coffee_type,
+                'serving_temp'     => $coffee->serving_temp,
+                'nuts'             => $coffee->nuts,
                 'lactose'          => $coffee->lactose,
                 'minimum_price'    => $coffee->minimum_price,
                 'maximum_price'    => $coffee->maximum_price,
@@ -54,11 +56,11 @@ class CoffeeController extends Controller
             'ingredients' => 'nullable|string',
             'lactose' => 'nullable|string',
             'nuts' => 'nullable|string',
-            'minimum_price' => 'nullable|numeric|min:120',
-            'maximum_price' => 'nullable|numeric|max:1200',
+            'price' => 'required|numeric|min:120',
         ]);
 
         $data = $request->except('coffee_image');
+        $data['serving_temp'] = $request->input('serving_temp', 'hot');
 
         if ($request->hasFile('coffee_image')) {
             $data['coffee_image'] = $request->file('coffee_image')->store('coffee_image', 'public');
@@ -69,7 +71,7 @@ class CoffeeController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Coffee created successfully',
-            'coffee' => $coffee,
+            'coffee' => $coffee->only(['coffee_id', 'coffee_name', 'coffee_image', 'description', 'ingredients', 'coffee_type', 'serving_temp', 'price']),
         ], 201);
     }
 
@@ -111,6 +113,7 @@ class CoffeeController extends Controller
         ]);
 
         $data = $request->except('coffee_image');
+        $data['serving_temp'] = $request->input('serving_temp', $coffee->serving_temp);
 
         if ($request->hasFile('coffee_image')) {
             if ($coffee->coffee_image){

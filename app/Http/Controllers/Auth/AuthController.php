@@ -53,6 +53,12 @@ class AuthController extends Controller
                 'message' => 'Invalid credentials'
             ],401);
         }
+        if ($user->status === 'archived') {
+            return response()->json([
+                'deleted' => true,
+                'reason' => "Inactive for " . $user->archived_at->diffForHumans(),
+            ], 423); 
+        }
 
         $token = $user->createToken('api_token')->plainTextToken;
 

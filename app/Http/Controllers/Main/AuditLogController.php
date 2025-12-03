@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\AuditLogsModel;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class AuditLogController extends Controller
 {
@@ -32,6 +33,7 @@ class AuditLogController extends Controller
     public function toggleStatus(Request $request, $id)
     {
         $user = User::findOrFail($id);
+
         $newStatus = $user->status === 'active' ? 'inactive' : 'active';
         $user->update(['status' => $newStatus]);
 
@@ -101,7 +103,7 @@ class AuditLogController extends Controller
                 $user->update([
                     'status' => 'archived',
                     'archived_at' => now(),
-                    'deleted_at' => now(),
+                    'deleted_at' => now(), // uses soft delete
                 ]);
 
                 AuditLogsModel::create([
@@ -174,19 +176,7 @@ class AuditLogController extends Controller
         return response()->json($logs);
     }
 
-    // Fetch only preference-related audit logs
-    public function preferenceLogs(Request $request)
-    {
-        $logs = AuditLogsModel::with('user:id,display_name')
-            ->where('action', 'PREFERENCE_UPDATED')
-            ->select('id', 'user_id', 'action', 'description', 'created_at')
-            ->latest()
-            ->paginate(30);
-
-        return response()->json($logs);
-    }
-
-    // Add coffee-related audit logging
+    // Placeholder: Add coffee-related audit logging
     public function coffeeAudit($action, $coffeeId, $coffeeName, $adminId = null)
     {
         AuditLogsModel::create([

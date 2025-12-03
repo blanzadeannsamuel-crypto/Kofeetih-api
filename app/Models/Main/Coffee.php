@@ -18,9 +18,10 @@ class Coffee extends Model
         'coffee_type',
         'description',
         'ingredients',
+        'serving_temp',
+        'nuts',
         'lactose',
-        'minimum_price',
-        'maximum_price',
+        'price',
         'rating',
         'likes',
         'favorites',
@@ -31,8 +32,7 @@ class Coffee extends Model
         'rating' => 'float',
         'likes' => 'integer',
         'favorites' => 'integer',
-        'minimum_price' => 'float',
-        'maximum_price' => 'float',
+        'price' => 'float',
     ];
 
     public function likedBy() {

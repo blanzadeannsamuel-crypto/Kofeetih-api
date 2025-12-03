@@ -18,7 +18,7 @@ class Preference extends Model
         'user_id',  
         'coffee_type',
         'coffee_allowance',
-        'temp',
+        'serving_temp',
         'lactose',
         'nuts_allergy',
     ];

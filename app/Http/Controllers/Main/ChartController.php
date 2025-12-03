@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Main;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use App\Models\Main\Coffee;
 use App\Models\User;
 
@@ -12,127 +13,116 @@ class ChartController extends Controller
     public function summaryChart(Request $request)
     {
         $currentYear = date('Y');
-        $typeNames = ['strong', 'balanced', 'sweet'];
-        $tempNames = ['hot', 'cold'];
         $months = range(1, 12);
         $monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-        $monthlyPreference = DB::table('preferences')
-            ->selectRaw('MONTH(created_at) as month, LOWER(coffee_type) as coffee_type, LOWER(temp) as temp, COUNT(*) as total')
-            ->whereYear('created_at', $currentYear)
-            ->groupBy('month', 'coffee_type', 'temp')
-            ->get();
+        // Enum values
+        $coffeeTypes = ['arabica', 'robusta', 'liberica'];
+        $servingTemps = ['hot', 'cold', 'both'];
 
-        $monthlyData = ['coffee_types' => [], 'temperature' => []];
-        $monthlyForecast = ['coffee_types' => [], 'temperature' => []];
-        $monthlyMovingAvg = ['coffee_types' => [], 'temperature' => []];
+        // Cache monthly aggregated preferences
+        $monthlyPreference = Cache::remember("monthlyPreference_{$currentYear}", 3600, function() use ($currentYear) {
+            return DB::table('preferences')
+                ->selectRaw('MONTH(created_at) as month, LOWER(coffee_type) as coffee_type, LOWER(serving_temp) as serving_temp, COUNT(*) as total')
+                ->whereYear('created_at', $currentYear)
+                ->groupBy('month', 'coffee_type', 'serving_temp')
+                ->get();
+        });
 
-        // ---------------- COFFEE TYPES ----------------
+        $monthlyData = ['coffee_types' => [], 'serving_temp' => []];
+        $monthlyForecast = ['coffee_types' => [], 'serving_temp' => []];
+        $monthlyMovingAvg = ['coffee_types' => [], 'serving_temp' => []];
         $exponentialCoffee = [];
-        foreach ($typeNames as $type) {
-            $label = ucfirst($type);
-            $series = array_map(function ($m) use ($monthlyPreference, $type) {
+        $exponentialTemp = [];
+
+        // Helper to build forecast for series
+        $buildSeriesForecast = function(array $series, $currentYear) {
+            $movingAvg = $this->movingAverageSeries($series, 3);
+            $maForecast = $this->forecastNext3RollingMA(array_slice($series, -3));
+            $expResult = $this->forecastExponential(array_slice($series, -4), 0.4);
+            $expForecast = [$expResult['next']];
+            $maLabels = ['Jan ' . ($currentYear + 1), 'Feb ' . ($currentYear + 1), 'Mar ' . ($currentYear + 1)];
+            $expLabel = ['Jan ' . ($currentYear + 1)];
+
+            return [
+                'series' => $series,
+                'moving_avg' => $movingAvg,
+                'ma_forecast' => $maForecast,
+                'ma_labels' => $maLabels,
+                'exp_forecast' => $expForecast,
+                'exp_labels' => $expLabel,
+                'exp_history' => $expResult['history'],
+                'next_forecast' => $expResult['next']
+            ];
+        };
+
+        // Process coffee types
+        foreach ($coffeeTypes as $type) {
+            $series = array_map(function($m) use ($monthlyPreference, $type) {
                 $match = $monthlyPreference->first(fn($r) => intval($r->month) === $m && ($r->coffee_type ?? '') === $type);
                 return intval($match->total ?? 0);
             }, $months);
 
+            $label = ucfirst($type);
+            $forecast = $buildSeriesForecast($series, $currentYear);
+
             $monthlyData['coffee_types'][$label] = $series;
-
-            // ---------------- MOVING AVERAGE ----------------
-            $monthlyMovingAvg['coffee_types'][$label] = $this->movingAverageSeries($series, 3);
-
-            $maForecast = $this->forecastNext3RollingMA(array_slice($series, -3)); // Oct-Dec
-            $maLabels = ['Jan ' . ($currentYear + 1), 'Feb ' . ($currentYear + 1), 'Mar ' . ($currentYear + 1)];
-
-            // ---------------- EXPONENTIAL ----------------
-            $expResult = $this->forecastExponential(array_slice($series, -4), 0.4); // Sep-Dec
-            $expForecast = [$expResult['next']]; // forecast for Jan
-            $expLabel = ['Jan ' . ($currentYear + 1)];
-            $exponentialCoffee[$label] = $expForecast[0];
-
-            $monthlyForecast['coffee_types'][$label] = [
-                'ma_labels' => $maLabels,
-                'ma_values' => $maForecast,
-                'exp_labels' => $expLabel,
-                'exp_values' => $expForecast,
-                'exp_history' => $expResult['history'] // optional: Sep-Dec forecasted history
-            ];
+            $monthlyMovingAvg['coffee_types'][$label] = $forecast['moving_avg'];
+            $monthlyForecast['coffee_types'][$label] = $forecast;
+            $exponentialCoffee[$label] = $forecast['next_forecast'];
         }
 
-        // ---------------- TEMPERATURE ----------------
-        $exponentialTemp = [];
-        foreach ($tempNames as $temp) {
-            $label = ucfirst($temp);
-            $series = array_map(function ($m) use ($monthlyPreference, $temp) {
-                $match = $monthlyPreference->first(fn($r) => intval($r->month) === $m && ($r->temp ?? '') === $temp);
+        // Process serving temps
+        foreach ($servingTemps as $temp) {
+            $series = array_map(function($m) use ($monthlyPreference, $temp) {
+                $match = $monthlyPreference->first(fn($r) => intval($r->month) === $m && ($r->serving_temp ?? '') === $temp);
                 return intval($match->total ?? 0);
             }, $months);
 
-            $monthlyData['temperature'][$label] = $series;
+            $label = ucfirst($temp);
+            $forecast = $buildSeriesForecast($series, $currentYear);
 
-            // ---------------- MOVING AVERAGE ----------------
-            $monthlyMovingAvg['temperature'][$label] = $this->movingAverageSeries($series, 3);
-
-            $maForecast = $this->forecastNext3RollingMA(array_slice($series, -3)); // Oct-Dec
-            $maLabels = ['Jan ' . ($currentYear + 1), 'Feb ' . ($currentYear + 1), 'Mar ' . ($currentYear + 1)];
-
-            // ---------------- EXPONENTIAL ----------------
-            $expResult = $this->forecastExponential(array_slice($series, -4), 0.4); // Sep-Dec
-            $expForecast = [$expResult['next']]; // forecast for Jan
-            $expLabel = ['Jan ' . ($currentYear + 1)];
-            $exponentialTemp[$label] = $expForecast[0];
-
-            $monthlyForecast['temperature'][$label] = [
-                'ma_labels' => $maLabels,
-                'ma_values' => $maForecast,
-                'exp_labels' => $expLabel,
-                'exp_values' => $expForecast,
-                'exp_history' => $expResult['history']
-            ];
+            $monthlyData['serving_temp'][$label] = $series;
+            $monthlyMovingAvg['serving_temp'][$label] = $forecast['moving_avg'];
+            $monthlyForecast['serving_temp'][$label] = $forecast;
+            $exponentialTemp[$label] = $forecast['next_forecast'];
         }
 
-        // ---------------- TREND REPORT ----------------
+        // Determine trends
         $trendCoffee = array_keys($exponentialCoffee, max($exponentialCoffee))[0];
         $trendTemp = array_keys($exponentialTemp, max($exponentialTemp))[0];
         $trendReport = [
-            'coffee_type' => "The trend for coffee type for next month is **{$trendCoffee}**.",
-            'temperature' => "The trend for temperature for next month is **{$trendTemp}**."
+            'coffee_type' => "Coffee type trend for next month is {$trendCoffee}.",
+            'temperature' => "Temperature trend for next month is {$trendTemp}."
         ];
 
-        // ---------------- TOP 10 BY LIKES ----------------
+        // Top 10 coffees by likes
         $topByLikes = Coffee::withCount('likedBy')
             ->get()
-            ->map(function ($c) {
-                return [
-                    'coffee_id' => $c->coffee_id,
-                    'coffee_name' => $c->coffee_name,
-                    'coffee_image' => $c->coffee_image ? asset('storage/' . $c->coffee_image) : null,
-                    'total_likes' => intval($c->liked_by_count ?? 0) + intval($c->coffee_likes ?? 0)
-                ];
-            })
+            ->map(fn($c) => [
+                'coffee_id' => $c->coffee_id,
+                'coffee_name' => $c->coffee_name,
+                'coffee_image' => $c->coffee_image ? asset('storage/' . $c->coffee_image) : null,
+                'total_likes' => intval($c->liked_by_count ?? 0)
+            ])
             ->sortByDesc('total_likes')
             ->take(10)
             ->values();
 
-        $topLikedCoffee = $topByLikes->first(); // Top 1 liked coffee for report
+        $topLikedCoffee = $topByLikes->first();
 
-        // ---------------- TOP 10 BY AVERAGE RATING ----------------
+        // Top 10 coffees by rating
         $topByRating = Coffee::withAvg('ratings', 'rating')
             ->get()
-            ->map(function ($c) {
-                return [
-                    'coffee_id' => $c->coffee_id,
-                    'coffee_name' => $c->coffee_name,
-                    'coffee_image' => $c->coffee_image ? asset('storage/' . $c->coffee_image) : null,
-                    'avg_rate' => round(floatval($c->ratings_avg_rating ?? 0), 1)
-                ];
-            })
+            ->map(fn($c) => [
+                'coffee_id' => $c->coffee_id,
+                'coffee_name' => $c->coffee_name,
+                'coffee_image' => $c->coffee_image ? asset('storage/' . $c->coffee_image) : null,
+                'avg_rate' => round(floatval($c->ratings_avg_rating ?? 0), 1)
+            ])
             ->sortByDesc('avg_rate')
             ->take(10)
             ->values();
-
-        $userCount = User::count();
-        $totalCoffees = Coffee::count();
 
         return response()->json([
             'monthlyData' => $monthlyData,
@@ -143,13 +133,12 @@ class ChartController extends Controller
             'topByLikes' => $topByLikes,
             'topLikedCoffee' => $topLikedCoffee,
             'topByRating' => $topByRating,
-            'userCount' => $userCount,
-            'coffeeCount' => $totalCoffees,
+            'userCount' => User::count(),
+            'coffeeCount' => Coffee::count(),
             'trendReport' => $trendReport
         ]);
     }
 
-    // ---------------- HELPER FUNCTIONS ----------------
     private function movingAverageSeries(array $series, int $window = 3)
     {
         $n = count($series);
@@ -184,21 +173,17 @@ class ChartController extends Controller
 
         $n = count($series);
         $forecasts = [];
-
-        // First forecast = first actual
         $forecasts[0] = $series[0];
 
-        // Compute forecast for each month
         for ($i = 1; $i < $n; $i++) {
             $forecasts[$i] = round($alpha * $series[$i] + (1 - $alpha) * $forecasts[$i - 1], 2);
         }
 
-        // Forecast next month after last month
         $nextForecast = round($alpha * end($series) + (1 - $alpha) * end($forecasts), 2);
 
         return [
-            'history' => $forecasts, // Sep-Dec forecasted history
-            'next' => $nextForecast   // Jan forecast
+            'history' => $forecasts,
+            'next' => $nextForecast
         ];
     }
 }

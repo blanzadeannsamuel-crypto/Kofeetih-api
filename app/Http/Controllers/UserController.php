@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Models\AuditLogsModel;
 
 class UserController extends Controller
 {
@@ -28,11 +29,17 @@ class UserController extends Controller
     public function updateDisplayName(Request $request)
     {
         $request->validate(['display_name' => 'required|string|max:15']);
-
         $user = $request->user();
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $oldName = $user->display_name;
         $user->update(['display_name' => $request->display_name]);
+
+        AuditLogsModel::create([
+            'user_id' => $user->id,
+            'action' => 'UPDATE_DISPLAY_NAME',
+            'description' => "User updated display name from '{$oldName}' to '{$user->display_name}'"
+        ]);
 
         return response()->json([
             'message' => 'Display name updated successfully',
@@ -55,7 +62,7 @@ class UserController extends Controller
             'email' => $user->email,
         ]);
     }
-    
+
     public function updateSettings(Request $request)
     {
         $user = $request->user();
@@ -68,17 +75,35 @@ class UserController extends Controller
             'new_password' => 'nullable|string|min:8|confirmed',
         ]);
 
+        $changes = [];
+
         if (!empty($validated['new_password'])) {
             if (empty($validated['old_password']) || !Hash::check($validated['old_password'], $user->password)) {
                 return response()->json(['error' => 'Old password is incorrect.'], 422);
             }
             $user->password = bcrypt($validated['new_password']);
+            $changes[] = 'password';
         }
 
-        $user->first_name = $validated['first_name'] ?? $user->first_name;
-        $user->email = $validated['email'] ?? $user->email;
+        if (!empty($validated['first_name']) && $validated['first_name'] !== $user->first_name) {
+            $changes[] = "first_name from '{$user->first_name}' to '{$validated['first_name']}'";
+            $user->first_name = $validated['first_name'];
+        }
+
+        if (!empty($validated['email']) && $validated['email'] !== $user->email) {
+            $changes[] = "email from '{$user->email}' to '{$validated['email']}'";
+            $user->email = $validated['email'];
+        }
 
         $user->save();
+
+        if (!empty($changes)) {
+            AuditLogsModel::create([
+                'user_id' => $user->id,
+                'action' => 'UPDATE_SETTINGS',
+                'description' => 'User updated settings: ' . implode(', ', $changes)
+            ]);
+        }
 
         return response()->json([
             'message' => 'Credentials updated successfully',

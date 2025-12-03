@@ -16,16 +16,21 @@ return new class extends Migration
             
             $table->string('last_name');
             $table->string('first_name');
-            $table->integer('age');
+            $table->date('birthdate');
             $table->string('email', 255)->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->enum('role', ['admin', 'user'])->default('user');
-            $table->rememberToken();
-            $table->timestamps();
+            $table->softDeletes();
 
+            $table->rememberToken();
+
+            $table->enum('status', ['active', 'inactive', 'pending_deletion', 'archived'])->default('active');
+            $table->timestamp('last_login_at')->nullable();
+            $table->timestamps();
+            $table->timestamp('pending_delete_at')->nullable();  
+            $table->timestamp('archived_at')->nullable();
             $table->index('role');
-            $table->index('age');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

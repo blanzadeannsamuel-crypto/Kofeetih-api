@@ -29,7 +29,7 @@ class PreferenceSeeder extends Seeder
                 'user_id' => $userId,
                 'coffee_type' => $faker->randomElement(['strong', 'balanced', 'sweet']),
                 'coffee_allowance' => $faker->numberBetween(200, 2500),
-                'temp' => $faker->randomElement(['hot', 'cold']),
+                'serving_temp' => $faker->randomElement(['hot', 'cold', 'both']),
                 'lactose' => $faker->boolean(),
                 'nuts_allergy' => $faker->boolean(),
                 'created_at' => $createdAt,
