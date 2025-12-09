@@ -4,195 +4,130 @@ namespace App\Http\Controllers\Main;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\User;
+use App\Models\Main\Preference;
+use Illuminate\Support\Facades\Cache;
 use App\Models\AuditLogsModel;
-use Illuminate\Support\Facades\DB;
+use App\Models\AuditLogsReport;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
-class AuditLogController extends Controller
+class PreferenceController extends Controller
 {
-    // Get all users and auto-set inactive for 7+ days
-    public function allUsers()
+    use AuthorizesRequests;
+    private function rules(): array
     {
-        $inactiveThreshold = now()->subDays(7);
-
-        User::where('last_login_at', '<=', $inactiveThreshold)
-            ->where('status', 'active')
-            ->update(['status' => 'inactive']);
-
-        $users = User::select('id', 'display_name', 'email', 'status', 'last_login_at')
-            ->orderBy('status', 'desc')
-            ->orderBy('id', 'asc')
-            ->get()
-            ->values();
-
-        return response()->json($users);
+        return [
+            'coffee_type' => 'nullable|in:arabica,robusta,liberica',
+            'coffee_allowance' => 'nullable|integer|min:120',
+            'serving_temp' => 'nullable|in:hot,iced,both',
+            'lactose' => 'nullable|boolean',
+            'nuts_allergy' => 'nullable|boolean',
+        ];
     }
 
-    // Toggle user status manually
-    public function toggleStatus(Request $request, $id)
+    public function index(Request $request)
     {
-        $user = User::findOrFail($id);
-        $newStatus = $user->status === 'active' ? 'inactive' : 'active';
-        $user->update(['status' => $newStatus]);
+        $userId = $request->user()->id;
+        $cacheKey = "preference_user_{$userId}";
 
-        AuditLogsModel::create([
-            'user_id' => $request->user()->id ?? null,
-            'action' => 'ADMIN_TOGGLE_STATUS',
-            'description' => "Admin changed status of user ID {$user->id} to {$newStatus}"
-        ]);
-
-        return response()->json([
-            'message' => "User status updated to {$newStatus}",
-            'status' => $newStatus
-        ]);
-    }
-
-    // Admin requests user deletion
-    public function adminRequestDelete(Request $request, int $id)
-    {
-        $user = User::findOrFail($id);
-
-        $user->update([
-            'status' => 'pending_deletion',
-            'pending_delete_at' => now(),
-        ]);
-
-        AuditLogsModel::create([
-            'user_id' => $request->user()->id ?? null,
-            'action' => 'ADMIN_PENDING_DELETE',
-            'description' => "Admin requested deletion for user ID {$user->id}"
-        ]);
-
-        return response()->json(['message' => 'User deletion set to pending.']);
-    }
-
-    // User cancels their pending deletion
-    public function cancelPendingDeletion(Request $request)
-    {
-        $user = $request->user();
-
-        if ($user->status !== 'pending_deletion') {
-            return response()->json(['error' => 'No deletion request pending'], 400);
-        }
-
-        $user->update([
-            'status' => 'active',
-            'pending_delete_at' => null,
-        ]);
-
-        AuditLogsModel::create([
-            'user_id' => $user->id,
-            'action' => 'USER_CANCELLED_PENDING_DELETE',
-            'description' => 'User cancelled deletion request.'
-        ]);
-
-        return response()->json(['message' => 'Deletion cancelled.']);
-    }
-
-    // Process pending deletions automatically
-    public function processPendingDeletions()
-    {
-        $users = User::where('status', 'pending_deletion')
-            ->where('pending_delete_at', '<=', now()->subDay())
-            ->get();
-
-        foreach ($users as $user) {
-            DB::transaction(function () use ($user) {
-                $user->update([
-                    'status' => 'archived',
-                    'archived_at' => now(),
-                    'deleted_at' => now(),
-                ]);
-
-                AuditLogsModel::create([
-                    'user_id' => null,
-                    'action' => 'SYSTEM_ARCHIVED_USER',
-                    'description' => "System archived user ID {$user->id}"
-                ]);
-            });
-        }
-
-        return response()->json(['processed' => $users->count()]);
-    }
-
-    // Recover user account (within 3 months of archive)
-    public function recoverAccount($id)
-    {
-        $user = User::onlyTrashed()->findOrFail($id);
-
-        if ($user->archived_at && $user->archived_at->lt(now()->subMonths(3))) {
-            return response()->json(['error' => 'Account cannot be recovered (older than 3 months).'], 403);
-        }
-
-        DB::transaction(function () use ($user) {
-            $user->restore();
-            $user->update([
-                'status' => 'active',
-                'archived_at' => null,
-            ]);
-
-            AuditLogsModel::create([
-                'user_id' => $user->id,
-                'action' => 'USER_RECOVERED_ACCOUNT',
-                'description' => "User {$user->id} recovered their account."
-            ]);
+        $preference = Cache::remember($cacheKey, 3600, function() use ($userId) {
+            return Preference::firstOrCreate(['user_id' => $userId]);
         });
 
-        return response()->json(['message' => 'Account recovered successfully.']);
+        return response()->json([
+            'status' => 'success',
+            'data' => $preference,
+        ]);
     }
 
-    // Permanently delete old archived accounts
-    public function processPermanentDeletes()
+    public function store(Request $request)
     {
-        $users = User::onlyTrashed()
-            ->where('archived_at', '<=', now()->subMonths(3))
-            ->get();
+        $validated = $request->validate($this->rules());
+        $user = $request->user();
+        $validated['user_id'] = $user->id;
 
-        foreach ($users as $user) {
-            DB::transaction(function () use ($user) {
-                AuditLogsModel::create([
-                    'user_id' => null,
-                    'action' => 'SYSTEM_PERMANENT_DELETE',
-                    'description' => "System permanently deleted user ID {$user->id}"
-                ]);
+        $preference = Preference::updateOrCreate(
+            ['user_id' => $user->id],
+            $validated
+        );
 
-                $user->forceDelete();
-            });
-        }
+        // Audit log for adding/updating preference
+        AuditLogsReport::create([
+            'user_id' => $user->id,
+            'type' => 'interaction',
+            'action' => 'PREFERENCE_UPDATED',
+            'description' => "{$user->display_name} added/updated their preference"
+        ]);
 
-        return response()->json(['deleted_permanently' => $users->count()]);
+        Cache::forget("preference_user_{$user->id}");
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $preference,
+            'message' => 'Preferences saved.',
+        ]);
     }
 
-    // Get paginated audit logs
-    public function auditList(Request $request)
+    public function show(Preference $preference)
     {
-        $logs = AuditLogsModel::with('user:id,display_name')
-            ->select('id', 'user_id', 'action', 'description', 'created_at')
-            ->latest()
-            ->paginate(30);
+        $this->authorize('view', $preference);
 
-        return response()->json($logs);
+        return response()->json([
+            'status' => 'success',
+            'data' => $preference,
+        ]);
     }
 
-    // Fetch only preference-related audit logs
-    public function preferenceLogs(Request $request)
+    public function update(Request $request, Preference $preference)
     {
-        $logs = AuditLogsModel::with('user:id,display_name')
-            ->where('action', 'PREFERENCE_UPDATED')
-            ->select('id', 'user_id', 'action', 'description', 'created_at')
-            ->latest()
-            ->paginate(30);
+        $this->authorize('update', $preference);
+        $validated = $request->validate($this->rules());
+        $preference->update($validated);
 
-        return response()->json($logs);
+        $user = $request->user();
+
+        AuditLogsReport::create([
+            'user_id' => $preference->user_id,
+            'type' => 'interaction',
+            'action' => 'PREFERENCE_UPDATED',
+            'description' => "{$user->display_name} updated their preference"
+        ]);
+
+        Cache::forget("preference_user_{$preference->user_id}");
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $preference,
+            'message' => 'Preference updated.',
+        ]);
     }
 
-    // Add coffee-related audit logging
-    public function coffeeAudit($action, $coffeeId, $coffeeName, $adminId = null)
+    public function destroy(Preference $preference)
     {
-        AuditLogsModel::create([
-            'user_id' => $adminId,
-            'action' => $action,
-            'description' => "Coffee action: {$action} | ID: {$coffeeId} | Name: {$coffeeName}"
+        $this->authorize('delete', $preference);
+
+        $preference->delete();
+
+        Cache::forget("preference_user_{$preference->user_id}");
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Preference removed.',
+        ]);
+    }
+
+    public function restore(int $id)
+    {
+        $preference = Preference::onlyTrashed()->findOrFail($id);
+
+        $this->authorize('restore', $preference);
+
+        $preference->restore();
+        Cache::forget("preference_user_{$preference->user_id}");
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Preference restored successfully.',
+            'data' => $preference,
         ]);
     }
 }

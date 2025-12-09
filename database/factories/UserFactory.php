@@ -18,7 +18,6 @@ class UserFactory extends Factory
         $birthdate = fake()->dateTimeBetween('-99 years', '-13 years')->format('Y-m-d');
 
         // Random status
-        $status = fake()->randomElement(['active', 'inactive']);
 
         return [
             'last_name' => $lastName,
@@ -29,7 +28,6 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'role' => 'user',
-            'status' => $status,
         ];
     }
 

@@ -21,15 +21,10 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->enum('role', ['admin', 'user'])->default('user');
-            $table->softDeletes();
 
             $table->rememberToken();
 
-            $table->enum('status', ['active', 'inactive', 'pending_deletion', 'archived'])->default('active');
-            $table->timestamp('last_login_at')->nullable();
             $table->timestamps();
-            $table->timestamp('pending_delete_at')->nullable();  
-            $table->timestamp('archived_at')->nullable();
             $table->index('role');
         });
 

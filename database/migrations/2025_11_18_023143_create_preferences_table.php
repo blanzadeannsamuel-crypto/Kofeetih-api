@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('preferences', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('coffee_type')->nullable();
+            $table->enum('coffee_type', ['arabica', 'robusta', 'liberica'])->nullable();
             $table->unsignedInteger('coffee_allowance')->nullable();
-            $table->enum('serving_temp', ['hot', 'cold', 'both'])->nullable();
+            $table->enum('serving_temp', ['hot', 'iced', 'both'])->nullable();
             $table->boolean('lactose')->default(false);
             $table->boolean('nuts_allergy')->default(false);
             $table->timestamps();

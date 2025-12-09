@@ -18,7 +18,7 @@ class ChartController extends Controller
 
         // Enum values
         $coffeeTypes = ['arabica', 'robusta', 'liberica'];
-        $servingTemps = ['hot', 'cold', 'both'];
+        $servingTemps = ['hot', 'iced', 'both'];
 
         // Cache monthly aggregated preferences
         $monthlyPreference = Cache::remember("monthlyPreference_{$currentYear}", 3600, function() use ($currentYear) {
@@ -79,7 +79,9 @@ class ChartController extends Controller
                 return intval($match->total ?? 0);
             }, $months);
 
-            $label = ucfirst($temp);
+            // Use lowercase 'both' internally but display proper label
+            $label = $temp === 'both' ? 'Hot, Iced' : ucfirst($temp);
+
             $forecast = $buildSeriesForecast($series, $currentYear);
 
             $monthlyData['serving_temp'][$label] = $series;
@@ -91,9 +93,23 @@ class ChartController extends Controller
         // Determine trends
         $trendCoffee = array_keys($exponentialCoffee, max($exponentialCoffee))[0];
         $trendTemp = array_keys($exponentialTemp, max($exponentialTemp))[0];
+
+        // Moving average forecasts
+        $maCoffeeForecasts = array_map(fn($f) => end($f['ma_forecast']), $monthlyForecast['coffee_types']);
+        $maTempForecasts = array_map(fn($f) => end($f['ma_forecast']), $monthlyForecast['serving_temp']);
+
+        $trendCoffeeMA = array_keys($maCoffeeForecasts, max($maCoffeeForecasts))[0];
+        $trendTempMA = array_keys($maTempForecasts, max($maTempForecasts))[0];
+
+        // Format trend text for "both" temperature
+        $trendTempText = ($trendTemp === 'Hot, Iced') ? 'both Hot and Iced' : $trendTemp;
+        $trendTempMAText = ($trendTempMA === 'Hot, Iced') ? 'both Hot and Iced' : $trendTempMA;
+
         $trendReport = [
-            'coffee_type' => "Coffee type trend for next month is {$trendCoffee}.",
-            'temperature' => "Temperature trend for next month is {$trendTemp}."
+            'coffee_type' => "Coffee type trend for next month is {$trendCoffee} with forecasted value of {$exponentialCoffee[$trendCoffee]}.",
+            'temperature' => "Serving Temperature trend for next month is {$trendTempText} with forecasted value of {$exponentialTemp[$trendTemp]}.",
+            'coffee_type_ma' => "The coffee type trend 3 months from now is {$trendCoffeeMA} with forecasted value of {$maCoffeeForecasts[$trendCoffeeMA]}.",
+            'temperature_ma' => "The serving temperature trend 3 months from now is {$trendTempMAText} with forecasted value of {$maTempForecasts[$trendTempMA]}."
         ];
 
         // Top 10 coffees by likes
@@ -124,6 +140,8 @@ class ChartController extends Controller
             ->take(10)
             ->values();
 
+        $topRatedCoffee = $topByRating->first(); // <-- added top-rated coffee
+
         return response()->json([
             'monthlyData' => $monthlyData,
             'monthlyForecast' => $monthlyForecast,
@@ -133,6 +151,7 @@ class ChartController extends Controller
             'topByLikes' => $topByLikes,
             'topLikedCoffee' => $topLikedCoffee,
             'topByRating' => $topByRating,
+            'topRatedCoffee' => $topRatedCoffee, // <-- included in response
             'userCount' => User::count(),
             'coffeeCount' => Coffee::count(),
             'trendReport' => $trendReport

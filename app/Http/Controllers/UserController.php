@@ -6,12 +6,50 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\AuditLogsModel;
+use App\Models\Main\Coffee;
+use App\Models\Main\MustTryCoffee;
 
 class UserController extends Controller
 {
+    
+    public function fetchCoffee(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
+
+        $userId = $user->id;
+
+        $coffees = Coffee::with(['likedBy', 'favoritedBy'])
+            ->whereHas('likedBy', fn($q) => $q->where('users.id', $userId))
+            ->orWhereHas('favoritedBy', fn($q) => $q->where('users.id', $userId))
+            ->get();
+
+        $coffeeIds = $coffees->pluck('id');
+        $feedbacks = MustTryCoffee::where('user_id', $userId)
+            ->whereIn('coffee_id', $coffeeIds)
+            ->pluck('comment', 'coffee_id');
+
+        $coffees = $coffees->map(function ($coffee) use ($userId, $feedbacks) {
+            return [
+                'coffee_id'       => $coffee->coffee_id,
+                'coffee_name'     => $coffee->coffee_name,
+                'coffee_image'    => $coffee->coffee_image ? asset('storage/' . $coffee->coffee_image) : null,
+                'coffee_type'     => $coffee->coffee_type,
+                'likes'           => $coffee->likes ?? 0,
+                'favorites'       => $coffee->favorites ?? 0,
+                'likedByUser'     => $coffee->likedBy->contains('id', $userId),
+                'favoritedByUser' => $coffee->favoritedBy->contains('id', $userId),
+                'userFeedback'    => $feedbacks[$coffee->id] ?? null,
+            ];
+        });
+
+        return response()->json($coffees);
+    }
+
+
     public function index()
     {
-        $users = User::select('id', 'first_name', 'last_name', 'display_name', 'email', 'age')->get();
+        $users = User::select('id', 'first_name', 'display_name', 'birthdate', 'email')->get();
 
         return response()->json(
             $users->map(fn($u) => [
@@ -19,13 +57,16 @@ class UserController extends Controller
                 'name'         => $u->display_name ?: $u->first_name,
                 'display_name' => $u->display_name,
                 'first_name'   => $u->first_name,
-                'last_name'    => $u->last_name,
-                'email'        => $u->email,
+                'birthdate'    => $u->birthdate,
                 'age'          => $u->age,
+                'email'        => $u->email,
             ])
         );
     }
 
+    // =======================
+    // Update Display Name
+    // =======================
     public function updateDisplayName(Request $request)
     {
         $request->validate(['display_name' => 'required|string|max:15']);
@@ -47,22 +88,37 @@ class UserController extends Controller
         ]);
     }
 
+    // =======================
+    // Get Current Authenticated User
+    // =======================
     public function me(Request $request)
     {
         $user = $request->user();
         if (!$user) return response()->json(['error' => 'Unauthorized'], 401);
 
+        $preference = $user->preference;
+
         return response()->json([
-            'id' => $user->id,
-            'name' => $user->display_name ?: $user->first_name,
-            'display_name' => $user->display_name, 
-            'first_name' => $user->first_name,
-            'last_name' => $user->last_name,
-            'age' => $user->age,
-            'email' => $user->email,
+            'id'           => $user->id,
+            'name'         => $user->display_name ?: $user->first_name,
+            'display_name' => $user->display_name,
+            'first_name'   => $user->first_name,
+            'birthdate'    => $user->birthdate,
+            'age'          => $user->age,
+            'email'        => $user->email,
+            'preference' => $preference ? [
+                'coffee_type' => $preference->coffee_type,
+                'coffee_allowance' => $preference->coffee_allowance,
+                'serving_temp' => $preference->serving_temp,
+                'lactose' => $preference->lactose ? 'Yes' : 'No',
+                'nuts_allergy' => $preference->nuts_allergy ? 'Yes' : 'No',
+            ] : null,
         ]);
     }
 
+    // =======================
+    // Update User Settings
+    // =======================
     public function updateSettings(Request $request)
     {
         $user = $request->user();
@@ -107,16 +163,25 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Credentials updated successfully',
-            'user'    => $user->only(['first_name', 'email', 'display_name']),
+            'user'    => $user->only(['first_name', 'email', 'display_name', 'age']),
         ]);
     }
 
+    // =======================
+    // Get Authenticated User With Age
+    // =======================
     public function allUser(Request $request)
     {
         $user = $request->user();
 
-        return response()->json($user->only([
-            'id', 'last_name', 'first_name', 'display_name', 'age', 'email', 'role',
-        ]));    
+        return response()->json([
+            'id'           => $user->id,
+            'last_name'    => $user->last_name,
+            'first_name'   => $user->first_name,
+            'display_name' => $user->display_name,
+            'age'          => $user->age,
+            'email'        => $user->email,
+            'role'         => $user->role,
+        ]);
     }
 }

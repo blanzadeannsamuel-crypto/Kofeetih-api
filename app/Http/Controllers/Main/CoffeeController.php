@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use App\Models\Main\Coffee;
+use App\Models\Main\MustTryCoffee;
+use App\Models\AuditLogsReport;
 
 class CoffeeController extends Controller
 {
@@ -14,12 +16,19 @@ class CoffeeController extends Controller
     {
         $userId = optional($request->user())->id;
 
-
         $coffees = Coffee::with(['ratings', 'likedBy', 'favoritedBy'])->get();
 
         $coffees = $coffees->map(function ($coffee) use ($userId) {
             $averageRating = $coffee->final_average_rating;
             $userRating = optional($coffee->ratings->where('user_id', $userId)->first())->rating;
+
+            $userFeedback = $userId ? MustTryCoffee::where('user_id', $userId)
+                                             ->where('coffee_id', $coffee->coffee_id)
+                                             ->value('comment') : null;
+
+            $inMustTry = $userId ? MustTryCoffee::where('user_id', $userId)
+                                ->where('coffee_id', $coffee->coffee_id)
+                                ->exists() : false;
 
             return [
                 'coffee_id'        => $coffee->coffee_id,
@@ -31,35 +40,40 @@ class CoffeeController extends Controller
                 'serving_temp'     => $coffee->serving_temp,
                 'nuts'             => $coffee->nuts,
                 'lactose'          => $coffee->lactose,
-                'minimum_price'    => $coffee->minimum_price,
-                'maximum_price'    => $coffee->maximum_price,
+                'price'            => $coffee->price,
                 'likes'            => $coffee->likes,
                 'favorites'        => $coffee->favorites,
                 'rating'           => $averageRating,
                 'likedByUser'      => $userId ? $coffee->likedBy->contains('id', $userId) : false,
                 'favoritedByUser'  => $userId ? $coffee->favoritedBy->contains('id', $userId) : false,
                 'userRating'       => $userRating,
+                'userFeedback'     => $userFeedback,
+                'inMustTry'        => $inMustTry,
             ];
         });
 
         return response()->json($coffees);
     }
 
-    //this part is just a back up for adding coffee pero function lang naman natin likes, favorite, rates.
     public function store(Request $request)
     {
         $request->validate([
             'coffee_name' => 'required|string|max:255',
             'coffee_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'coffee_type' => 'required|string|max:100',
+            'coffee_type' => 'required|in:arabica,robusta,liberica',
             'description' => 'nullable|string',
             'ingredients' => 'nullable|string',
-            'lactose' => 'nullable|string',
-            'nuts' => 'nullable|string',
-            'price' => 'required|numeric|min:120',
+            'lactose' => 'nullable',
+            'nuts' => 'nullable',
+            'price' => 'required|numeric|min:0',
+            'serving_temp' => 'nullable|in:hot,iced,both',
         ]);
 
         $data = $request->except('coffee_image');
+
+        // Convert checkboxes to integers for MySQL
+        $data['nuts'] = (int) filter_var($request->input('nuts', false), FILTER_VALIDATE_BOOLEAN);
+        $data['lactose'] = (int) filter_var($request->input('lactose', false), FILTER_VALIDATE_BOOLEAN);
         $data['serving_temp'] = $request->input('serving_temp', 'hot');
 
         if ($request->hasFile('coffee_image')) {
@@ -71,7 +85,10 @@ class CoffeeController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Coffee created successfully',
-            'coffee' => $coffee->only(['coffee_id', 'coffee_name', 'coffee_image', 'description', 'ingredients', 'coffee_type', 'serving_temp', 'price']),
+            'coffee' => $coffee->only([
+                'coffee_id', 'coffee_name', 'coffee_image', 'description', 
+                'ingredients', 'coffee_type', 'serving_temp', 'price', 'nuts', 'lactose'
+            ]),
         ], 201);
     }
 
@@ -97,29 +114,36 @@ class CoffeeController extends Controller
         ]);
     }
 
-    //this is for just in case part if needed
     public function update(Request $request, Coffee $coffee)
     {
         $request->validate([
             'coffee_name' => 'nullable|string|max:255',
             'coffee_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'coffee_type' => 'nullable|in:arabica,robusta,liberica',
             'description' => 'nullable|string',
             'ingredients' => 'nullable|string',
-            'coffee_type' => 'nullable|string|max:100',
-            'lactose' => 'nullable|boolean',
-            'nuts' => 'nullable|boolean',
-            'minimum_price' => 'nullable|numeric|min:120',
-            'maximum_price' => 'nullable|numeric|max:1200',
+            'lactose' => 'nullable',
+            'nuts' => 'nullable',
+            'price' => 'nullable|numeric|min:0',
+            'serving_temp' => 'nullable|in:hot,iced,both',
         ]);
 
         $data = $request->except('coffee_image');
+
+        // Convert checkboxes to integers
+        if ($request->has('nuts')) {
+            $data['nuts'] = (int) filter_var($request->input('nuts'), FILTER_VALIDATE_BOOLEAN);
+        }
+        if ($request->has('lactose')) {
+            $data['lactose'] = (int) filter_var($request->input('lactose'), FILTER_VALIDATE_BOOLEAN);
+        }
+
         $data['serving_temp'] = $request->input('serving_temp', $coffee->serving_temp);
 
         if ($request->hasFile('coffee_image')) {
-            if ($coffee->coffee_image){
+            if ($coffee->coffee_image) {
                 Storage::disk('public')->delete($coffee->coffee_image);
             }
-             
             $data['coffee_image'] = $request->file('coffee_image')->store('coffee_image', 'public');
         }
 
@@ -128,11 +152,13 @@ class CoffeeController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Coffee updated successfully',
-            'coffee' => $coffee,
+            'coffee' => $coffee->only([
+                'coffee_id', 'coffee_name', 'coffee_image', 'description',
+                'ingredients', 'coffee_type', 'serving_temp', 'price', 'nuts', 'lactose'
+            ]),
         ]);
     }
 
-    // Delete coffee
     public function destroy(Coffee $coffee)
     {
         $coffee->delete();
@@ -145,20 +171,27 @@ class CoffeeController extends Controller
 
     public function like(Request $request, Coffee $coffee)
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
 
-            return DB::transaction(function () use ($coffee, $userId) {
+        return DB::transaction(function () use ($coffee, $user) {
 
-            $alreadyLiked = $coffee->likedBy()->where('user_id', $userId)->exists();
+            $alreadyLiked = $coffee->likedBy()->where('user_id', $user->id)->exists();
 
             if ($alreadyLiked) {
-                $coffee->likedBy()->detach($userId);
+                $coffee->likedBy()->detach($user->id);
                 $coffee->decrement('likes');
                 $liked = false;
             } else {
-                $coffee->likedBy()->attach($userId);
+                $coffee->likedBy()->attach($user->id);
                 $coffee->increment('likes');
                 $liked = true;
+
+                AuditLogsReport::create([
+                    'user_id' => $user->id,
+                    'type' => 'interaction',
+                    'action' => 'LIKE COFFEE',
+                    'description' => "{$user->display_name} liked {$coffee->coffee_name}"
+                ]);
             }
 
             return response()->json([
@@ -170,19 +203,26 @@ class CoffeeController extends Controller
 
     public function favorite(Request $request, Coffee $coffee)
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
 
-        return DB::transaction(function () use ($coffee, $userId) {
-            $alreadyFavorited = $coffee->favoritedBy()->where('user_id', $userId)->exists();
+        return DB::transaction(function () use ($coffee, $user) {
+            $alreadyFavorited = $coffee->favoritedBy()->where('user_id', $user->id)->exists();
 
             if($alreadyFavorited){
-                $coffee->favoritedBy()->detach($userId);
+                $coffee->favoritedBy()->detach($user->id);
                 $coffee->decrement('favorites');
                 $favorited = false;
             }else{
-                $coffee->favoritedBy()->attach($userId);
+                $coffee->favoritedBy()->attach($user->id);
                 $coffee->increment('favorites');
                 $favorited = true;
+
+                AuditLogsReport::create([
+                    'user_id' => $user->id,
+                    'type' => 'interaction',
+                    'action' => 'FAVORITE COFFEE',
+                    'description' => "{$user->display_name} favorited {$coffee->coffee_name}"
+                ]);
             }
 
             return response()->json([
@@ -194,23 +234,29 @@ class CoffeeController extends Controller
 
     public function rate(Request $request, Coffee $coffee)
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
         $request->validate(['rating' => 'required|integer|min:1|max:5']);
 
-        return DB::transaction(function () use ($coffee, $userId, $request) {
+        return DB::transaction(function () use ($coffee, $user, $request) {
 
             $coffee->ratings()->updateOrCreate(
-                ['user_id' => $userId],
+                ['user_id' => $user->id],
                 ['rating' => $request->rating]
             );
 
             $coffee->load('ratings');
 
+            AuditLogsReport::create([
+                'user_id' => $user->id,
+                'type' => 'interaction',
+                'action' => 'RATE COFFEE',
+                'description' => "{$user->display_name} rated {$coffee->coffee_name} with {$request->rating} stars"
+            ]);
+
             return response()->json([
-                'rating' =>$coffee->final_average_rating,
+                'rating' => $coffee->final_average_rating,
                 'userRating' => $request->rating
             ]);
         });
     }
-    
 }

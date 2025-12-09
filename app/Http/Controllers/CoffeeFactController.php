@@ -55,8 +55,7 @@ class CoffeeFactController extends Controller
                 'coffee_type',
                 'lactose',
                 'nuts',
-                'minimum_price',
-                'maximum_price',
+                'price',
                 'coffee_image'
             ]);
 
@@ -85,7 +84,7 @@ class CoffeeFactController extends Controller
                 $reasons[] = "Nut-free, safe for your allergy";
             }
 
-            if ($preference->coffee_allowance && $coffee->maximum_price <= $preference->coffee_allowance) {
+            if ($preference->coffee_allowance && $coffee->price <= $preference->coffee_allowance) {
                 $score += 10;
                 $reasons[] = "Within your budget of ₱{$preference->coffee_allowance}";
             }

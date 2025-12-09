@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+    
     public function up(): void
     {
         Schema::create('coffees', function (Blueprint $table) {
@@ -18,7 +16,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('ingredients')->nullable();
             $table->enum('coffee_type', ['arabica', 'robusta', 'liberica']);
-            $table->enum('serving_temp', ['hot', 'cold', 'both'])->default('hot');
+            $table->enum('serving_temp', ['hot', 'iced', 'both'])->default('hot');
             $table->boolean('lactose')->default(false);
             $table->boolean('nuts')->default(false);
             $table->decimal('price', 5, 2)->default(0.00);

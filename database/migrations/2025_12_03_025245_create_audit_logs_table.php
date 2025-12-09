@@ -10,6 +10,7 @@ return new class extends Migration
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null')->index();
+            $table->string('type')->default('interaction')->index();
             $table->text('description');
             $table->string('action');
             $table->timestamps();

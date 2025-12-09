@@ -10,10 +10,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\Main\Coffee;
 use App\Models\Main\Preference;
 use App\Models\Main\Like;
+use Carbon\Carbon;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $primaryKey = 'id';
 
@@ -21,12 +22,10 @@ class User extends Authenticatable
         'last_name',
         'first_name',
         'display_name',
-        'age',
+        'birthdate',
         'email',
         'password',
         'role',
-        'status',          // Added for active/inactive/pending_deletion
-        'last_login_at',   // Added to track last login for inactivity
     ];
 
     protected $hidden = [
@@ -37,19 +36,18 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
-        'last_login_at' => 'datetime', // Cast last login to datetime
+        'birthdate' => 'date',
     ];
 
     protected $dates = [
-        'deleted_at',
-        'pending_delete_at',
-        'archived_at',
-        'last_login_at',
+        'birthdate',
     ];
 
     public $timestamps = true;
 
+    // =======================
     // Relations
+    // =======================
     public function likes()
     {
         return $this->belongsToMany(
@@ -83,5 +81,11 @@ class User extends Authenticatable
     public function preference()
     {
         return $this->hasOne(Preference::class, 'user_id');
+    }
+
+    public function getAgeAttribute()
+    {
+        if (!$this->birthdate) return null;
+        return Carbon::parse($this->birthdate)->age;
     }
 }

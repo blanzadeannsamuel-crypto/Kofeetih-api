@@ -23,6 +23,15 @@ class UserSeeder extends Seeder
             'email' => 'sam@gmail.com',
             'password' => Hash::make('12345678'), // change to secure password
             'role' => 'admin',
+        ],
+        [
+            'last_name' => 'quilang',
+            'first_name' => 'john kenedy',
+            'display_name' => 'ken',
+            'birthdate' => '2005-04-24',
+            'email' => 'ken@gmail.com',
+            'password' => Hash::make('12345678'), // change to secure password
+            'role' => 'user',
         ]);
 
         // Create 20 normal users using the factory

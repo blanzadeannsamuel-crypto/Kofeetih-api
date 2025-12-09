@@ -27,9 +27,9 @@ class PreferenceSeeder extends Seeder
 
             Preference::create([
                 'user_id' => $userId,
-                'coffee_type' => $faker->randomElement(['strong', 'balanced', 'sweet']),
+                'coffee_type' => $faker->randomElement(['arabica', 'robusta', 'liberica']),
                 'coffee_allowance' => $faker->numberBetween(200, 2500),
-                'serving_temp' => $faker->randomElement(['hot', 'cold', 'both']),
+                'serving_temp' => $faker->randomElement(['hot', 'iced', 'both']),
                 'lactose' => $faker->boolean(),
                 'nuts_allergy' => $faker->boolean(),
                 'created_at' => $createdAt,

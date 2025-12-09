@@ -3,7 +3,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class AuditLogsModel extends Model
+class AuditLogsReport extends Model
 {
     protected $table = 'audit_logs';
 
@@ -19,8 +19,8 @@ class AuditLogsModel extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function scopeAuth($query)
+    public function scopeInteraction($query)
     {
-        return $query->where('type', 'auth');
+        return $query->where('type', 'interaction');
     }
 }
